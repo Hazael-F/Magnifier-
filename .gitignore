@@ -30,3 +30,19 @@
 *.exe
 *.out
 *.app
+
+# Visual Studio-specific files
+[Bb]in/
+[Oo]bj/
+[Rr]elease/
+[Dd]ebug/
+x64/
+x86/
+*.suo
+*.user
+*.aps
+*.pdb
+*.ilk
+*.sdf
+*.opensdf
+.vs/
