@@ -20,7 +20,7 @@ DIRECT DOWNLOAD: https://github.com/Hazael-F/Magnifier-/releases/download/v1.0.0
 3. **Hold right-click + arrow keys** to adjust position.
 4. **Right-click system tray icon** to exit.
 
-================================================================================
+=========================================================================
 
 ## 🙏 Credits
 
@@ -39,7 +39,7 @@ DIRECT DOWNLOAD: https://github.com/Hazael-F/Magnifier-/releases/download/v1.0.0
 - Microsoft Docs team for API documentation
 - Open-source screen magnifier projects for inspiration
 
-===============================================================================
+=======================================================================
 
 ### ⚙️ Configuration
 Edit `MagnifierPlus.ini` to customize:
