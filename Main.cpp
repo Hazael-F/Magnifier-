@@ -5,271 +5,181 @@
   - Smooth 5-level zoom (1x to 5x)
   - Position adjustment controls
   - System tray accessibility
-  - Custom targeting reticle
+  - Precise offset configuration
   - Configurable settings via INI file
 ===============================================*/
 
-// Windows headers
 #include <windows.h>
-#include <magnification.h>  // Magnification API
-#include <tchar.h>          // Unicode support
-#include <shlwapi.h>        // Path manipulation
+#include <magnification.h>
+#include <tchar.h>
+#include <shlwapi.h>
 
-// Link necessary libraries
-#pragma comment(lib, "shlwapi.lib")      // For Path functions
-#pragma comment(lib, "Magnification.lib") // For magnification API
+#pragma comment(lib, "shlwapi.lib")
+#pragma comment(lib, "Magnification.lib")
 
-// Control IDs for configuration dialog
-#define IDC_WIDTH         1001
-#define IDC_HEIGHT        1002
-#define IDC_ZOOM_SIZE     1003
-#define IDC_OFFSET_X      1004
-#define IDC_OFFSET_Y      1005
-#define IDC_FPS           1006
-#define IDC_OFFSET_STEP   1007
-#define IDOK              1
-#define IDCANCEL          2
+// Configuration defaults
+#define DEFAULT_WINDOW_WIDTH      300
+#define DEFAULT_WINDOW_HEIGHT     300
+#define DEFAULT_BASE_ZOOM_SIZE    100
+#define DEFAULT_TARGET_FPS        60
+#define DEFAULT_OFFSET_STEP       5
 
-/*============== CONFIGURATION DEFAULTS ==============*/
-#define DEFAULT_WINDOW_WIDTH      300     // Default window width
-#define DEFAULT_WINDOW_HEIGHT     300     // Default window height
-#define DEFAULT_BASE_ZOOM_SIZE    100     // Base size of zoom area
-#define DEFAULT_INITIAL_LEFT_OFFSET -100  // Initial X offset
-#define DEFAULT_INITIAL_DOWN_OFFSET -100  // Initial Y offset
-#define DEFAULT_TARGET_FPS        71      // Refresh rate
-#define DEFAULT_OFFSET_STEP       5       // Move step size
+// Default manual adjustments (in steps)
+#define DEFAULT_HORIZONTAL_ADJUST  13
+#define DEFAULT_VERTICAL_ADJUST    13
 
-/*============== GLOBAL VARIABLES ==============*/
-// Configuration settings
+// Global variables
 int windowWidth = DEFAULT_WINDOW_WIDTH;
 int windowHeight = DEFAULT_WINDOW_HEIGHT;
 int baseZoomSize = DEFAULT_BASE_ZOOM_SIZE;
-int initialLeftOffset = DEFAULT_INITIAL_LEFT_OFFSET;
-int initialDownOffset = DEFAULT_INITIAL_DOWN_OFFSET;
 int targetFPS = DEFAULT_TARGET_FPS;
 int offsetStep = DEFAULT_OFFSET_STEP;
+int horizontalAdjust = DEFAULT_HORIZONTAL_ADJUST;
+int verticalAdjust = DEFAULT_VERTICAL_ADJUST;
 
-// INI file management
-WCHAR configPath[MAX_PATH];  // Path to config file
-bool iniFileExists = false;  // Flag if config exists
-
-// Zoom levels (1x to 5x)
 float zoomLevels[] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };
-int currentZoomLevel = 1;     // Current zoom level index
+int currentZoomLevel = 1;
+POINT currentOffset = { 0, 0 };
+RECT sourceRects[5];
 
-// Position tracking
-int currentLeftOffset = DEFAULT_INITIAL_LEFT_OFFSET;
-int currentDownOffset = DEFAULT_INITIAL_DOWN_OFFSET;
-RECT sourceRects[5];          // Source rectangles for each zoom level
-
-// Window handles
-HWND hwndMagnifier;          // Main window handle
-HWND hwndMag;                // Magnifier control handle
-
-// Input tracking
-bool isRightMouseDown = false;  // Right mouse button state
-HHOOK hMouseHook;             // Mouse hook handle
-HHOOK hKeyboardHook;          // Keyboard hook handle
-
-// System tray icon
+HWND hwndMagnifier, hwndMag;
+bool isRightMouseDown = false;
+HHOOK hMouseHook, hKeyboardHook;
 NOTIFYICONDATA nid = { 0 };
 
-/*============== CONFIGURATION FUNCTIONS ==============*/
+/*============== PRECISE OFFSET CALCULATION ==============*/
+void CalculateInitialOffset() {
+    // Base offset calculation
+    if (windowWidth == 300 && windowHeight == 300) {
+        currentOffset.x = -100;
+        currentOffset.y = -100;
+    }
+    else if (windowWidth == 600 && windowHeight == 600) {
+        currentOffset.x = -250;
+        currentOffset.y = -250;
+    }
+    else {
+        // Linear scaling for other sizes
+        float scale = (float)windowWidth / 300.0f;
+        currentOffset.x = (int)(-100 * scale);
+        currentOffset.y = currentOffset.x;
+    }
 
-// Show comprehensive startup information
-void ShowStartupInfo() {
-    WCHAR message[1024];
-    WCHAR exePath[MAX_PATH];
-
-    // Get executable path
-    GetModuleFileName(NULL, exePath, MAX_PATH);
-
-    // Format information message
-    swprintf(message, 1024,
-        L"Magnifier+ Initialization\n\n"
-        L"Executable path: %s\n"
-        L"Configuration file: %s\n\n"
-        L"Current Settings:\n"
-        L"- Window Size: %dx%d pixels\n"
-        L"- Zoom Area: %d pixels\n"
-        L"- Initial Offset: (%d, %d)\n"
-        L"- Refresh Rate: %d FPS\n"
-        L"- Move Step Size: %d pixels\n\n"
-        L"Controls:\n"
-        L"1. Right-click + Mouse Wheel: Change zoom level\n"
-        L"2. Right-click + Arrow Keys: Move viewport\n"
-        L"3. Right-click tray icon: Exit application\n\n"
-        L"Configuration: %s",
-        exePath,
-        configPath,
-        windowWidth, windowHeight,
-        baseZoomSize,
-        initialLeftOffset, initialDownOffset,
-        targetFPS,
-        offsetStep,
-        iniFileExists ? L"Loaded from INI file" : L"Using default values");
-
-    // Show information message box
-    MessageBox(NULL, message, L"Magnifier+ Information", MB_OK | MB_ICONINFORMATION);
+    // Apply manual adjustments (in steps)
+    currentOffset.x += (horizontalAdjust * offsetStep);
+    currentOffset.y += (verticalAdjust * offsetStep);
 }
 
-// Load configuration from INI file or use defaults
-void LoadConfig() {
-    // Get executable path and construct INI file path
-    GetModuleFileName(NULL, configPath, MAX_PATH);
-    PathRemoveFileSpec(configPath);
-    PathAppend(configPath, L"MagnifierPlus.ini");
-
-    // Check if INI file exists
-    iniFileExists = PathFileExists(configPath);
-
-    // Load values from INI or use defaults
-    windowWidth = GetPrivateProfileInt(L"Settings", L"WindowWidth", DEFAULT_WINDOW_WIDTH, configPath);
-    windowHeight = GetPrivateProfileInt(L"Settings", L"WindowHeight", DEFAULT_WINDOW_HEIGHT, configPath);
-    baseZoomSize = GetPrivateProfileInt(L"Settings", L"BaseZoomSize", DEFAULT_BASE_ZOOM_SIZE, configPath);
-    initialLeftOffset = GetPrivateProfileInt(L"Settings", L"InitialLeftOffset", DEFAULT_INITIAL_LEFT_OFFSET, configPath);
-    initialDownOffset = GetPrivateProfileInt(L"Settings", L"InitialDownOffset", DEFAULT_INITIAL_DOWN_OFFSET, configPath);
-    targetFPS = GetPrivateProfileInt(L"Settings", L"TargetFPS", DEFAULT_TARGET_FPS, configPath);
-    offsetStep = GetPrivateProfileInt(L"Settings", L"OffsetStep", DEFAULT_OFFSET_STEP, configPath);
-
-    // Set current offsets to initial values
-    currentLeftOffset = initialLeftOffset;
-    currentDownOffset = initialDownOffset;
-}
-
-// Save current configuration to INI file
-void SaveConfig() {
-    WCHAR buffer[32];
-
-    // Write all settings to INI file
-    swprintf(buffer, 32, L"%d", windowWidth);
-    WritePrivateProfileString(L"Settings", L"WindowWidth", buffer, configPath);
-
-    swprintf(buffer, 32, L"%d", windowHeight);
-    WritePrivateProfileString(L"Settings", L"WindowHeight", buffer, configPath);
-
-    swprintf(buffer, 32, L"%d", baseZoomSize);
-    WritePrivateProfileString(L"Settings", L"BaseZoomSize", buffer, configPath);
-
-    swprintf(buffer, 32, L"%d", initialLeftOffset);
-    WritePrivateProfileString(L"Settings", L"InitialLeftOffset", buffer, configPath);
-
-    swprintf(buffer, 32, L"%d", initialDownOffset);
-    WritePrivateProfileString(L"Settings", L"InitialDownOffset", buffer, configPath);
-
-    swprintf(buffer, 32, L"%d", targetFPS);
-    WritePrivateProfileString(L"Settings", L"TargetFPS", buffer, configPath);
-
-    swprintf(buffer, 32, L"%d", offsetStep);
-    WritePrivateProfileString(L"Settings", L"OffsetStep", buffer, configPath);
-
-    // Show confirmation
-    MessageBox(NULL, L"Settings saved successfully!", L"Configuration Saved", MB_OK | MB_ICONINFORMATION);
-}
-
-/*============== CORE FUNCTIONS ==============*/
-
-// Calculate source rectangles for all zoom levels
+/*============== MAGNIFICATION SOURCE CALCULATION ==============*/
 void CalculateSourceRects() {
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
     POINT center = { screenWidth / 2, screenHeight / 2 };
 
-    // Calculate aspect ratio compensation
-    float windowAspect = (float)windowWidth / windowHeight;
-    float baseAspect = 1.0f; // Original was square (300x300)
-
-    // Calculate effective size maintaining original proportions
-    int effectiveSize = (int)(baseZoomSize * (windowAspect > 1.0f ? 1.0f / windowAspect : 1.0f));
-
     for (int i = 0; i < 5; i++) {
         float zoom = zoomLevels[i];
-        int scaledWidth = (int)(effectiveSize / zoom);
-        int scaledHeight = (int)(effectiveSize / zoom);
+        int scaledSize = (int)(baseZoomSize / zoom);
 
-        // Adjust for actual window dimensions
-        if (windowAspect > 1.0f) {
-            scaledHeight = (int)(scaledHeight / windowAspect); // Wider window
-        }
-        else {
-            scaledWidth = (int)(scaledWidth * windowAspect);  // Taller window
-        }
-
-        // Calculate rectangle for this zoom level
         sourceRects[i] = {
-            center.x - (scaledWidth / 2) + (int)(currentLeftOffset / zoom),
-            center.y - (scaledHeight / 2) + (int)(currentDownOffset / zoom),
-            center.x + (scaledWidth / 2) + (int)(currentLeftOffset / zoom),
-            center.y + (scaledHeight / 2) + (int)(currentDownOffset / zoom)
+            center.x - (scaledSize / 2) + (int)(currentOffset.x / zoom),
+            center.y - (scaledSize / 2) + (int)(currentOffset.y / zoom),
+            center.x + (scaledSize / 2) + (int)(currentOffset.x / zoom),
+            center.y + (scaledSize / 2) + (int)(currentOffset.y / zoom)
         };
     }
 }
 
-// Load or create the program icon
-HICON LoadProgramIcon() {
-    WCHAR exePath[MAX_PATH];
-    GetModuleFileName(NULL, exePath, MAX_PATH);
-    PathRemoveFileSpec(exePath);
-    PathAppend(exePath, L"reticle.ico");
+/*============== LOAD CUSTOM ICON ==============*/
+HICON LoadCustomIcon() {
+    WCHAR iconPath[MAX_PATH];
+    GetModuleFileName(NULL, iconPath, MAX_PATH);
+    PathRemoveFileSpec(iconPath);
+    PathAppend(iconPath, L"reticle.ico");
 
-    // Try to load icon from file
     HICON hIcon = (HICON)LoadImage(
-        NULL, exePath, IMAGE_ICON,
-        32, 32, LR_LOADFROMFILE | LR_DEFAULTSIZE
+        NULL, iconPath, IMAGE_ICON,
+        0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE | LR_SHARED
     );
 
-    // If file not found, create a simple crosshair icon
     if (!hIcon) {
-        HDC hdc = GetDC(NULL);
-        HDC hdcMem = CreateCompatibleDC(hdc);
-        HBITMAP hColorBmp = CreateCompatibleBitmap(hdc, 32, 32);
-        SelectObject(hdcMem, hColorBmp);
-
-        // Draw red crosshair
-        HPEN hPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
-        SelectObject(hdcMem, hPen);
-        MoveToEx(hdcMem, 6, 16, NULL);
-        LineTo(hdcMem, 26, 16);
-        MoveToEx(hdcMem, 16, 6, NULL);
-        LineTo(hdcMem, 16, 26);
-
-        // Create icon from bitmap
-        ICONINFO ii = { 0 };
-        ii.fIcon = TRUE;
-        ii.hbmColor = hColorBmp;
-        ii.hbmMask = CreateBitmap(32, 32, 1, 1, NULL);
-        hIcon = CreateIconIndirect(&ii);
-
-        // Cleanup
-        DeleteObject(hPen);
-        DeleteObject(hColorBmp);
-        DeleteDC(hdcMem);
-        ReleaseDC(NULL, hdc);
+        hIcon = LoadIcon(NULL, IDI_APPLICATION);
     }
 
     return hIcon;
 }
 
-/*============== INPUT HANDLING ==============*/
+/*============== STARTUP INFORMATION ==============*/
+void ShowStartupInfo() {
+    WCHAR path[MAX_PATH];
+    GetModuleFileName(NULL, path, MAX_PATH);
+    PathRemoveFileSpec(path);
+    PathAppend(path, L"MagnifierPlus.ini");
 
-// Keyboard hook procedure for arrow key navigation
+    WCHAR message[1024];
+    wsprintf(message,
+        L"Magnifier+ Initialized\n\n"
+        L"Configuration File:\n%s\n\n"
+        L"Current Settings:\n"
+        L"- Window: %dx%d pixels\n"
+        L"- Zoom Area: %d pixels\n"
+        L"- Initial Offset: (%d, %d)\n"
+        L"- Adjustments: %dH, %dV steps\n"
+        L"- Move Step: %d pixels\n"
+        L"- Refresh Rate: %d FPS\n\n"
+        L"Controls:\n"
+        L"1. Right-click + Scroll: Zoom (1x-5x)\n"
+        L"2. Right-click + Arrows: Move view\n"
+        L"3. Right-click tray icon: Exit",
+        path, windowWidth, windowHeight, baseZoomSize,
+        currentOffset.x, currentOffset.y,
+        horizontalAdjust, verticalAdjust,
+        offsetStep, targetFPS);
+
+    MessageBox(NULL, message, L"Magnifier+ Ready", MB_OK | MB_ICONINFORMATION);
+}
+
+/*============== MAIN WINDOW PROCEDURE ==============*/
+LRESULT CALLBACK MagnifierWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_TIMER:
+        if (isRightMouseDown && currentZoomLevel > 1) {
+            MagSetWindowSource(hwndMag, sourceRects[currentZoomLevel - 1]);
+        }
+        break;
+
+    case WM_DESTROY:
+        UnhookWindowsHookEx(hMouseHook);
+        UnhookWindowsHookEx(hKeyboardHook);
+        Shell_NotifyIcon(NIM_DELETE, &nid);
+        PostQuitMessage(0);
+        break;
+
+    case WM_USER + 1:
+        if (lParam == WM_RBUTTONUP) DestroyWindow(hwnd);
+        break;
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+    return 0;
+}
+
+/*============== INPUT HANDLERS ==============*/
 LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode >= 0 && isRightMouseDown) {
         KBDLLHOOKSTRUCT* pKey = (KBDLLHOOKSTRUCT*)lParam;
-        bool offsetChanged = false;
+        bool changed = false;
 
-        // Handle arrow key presses
         if (wParam == WM_KEYDOWN) {
             switch (pKey->vkCode) {
-            case VK_LEFT:  currentLeftOffset -= offsetStep; offsetChanged = true; break;
-            case VK_RIGHT: currentLeftOffset += offsetStep; offsetChanged = true; break;
-            case VK_UP:    currentDownOffset -= offsetStep; offsetChanged = true; break;
-            case VK_DOWN:  currentDownOffset += offsetStep; offsetChanged = true; break;
+            case VK_LEFT:  currentOffset.x -= offsetStep; changed = true; break;
+            case VK_RIGHT: currentOffset.x += offsetStep; changed = true; break;
+            case VK_UP:    currentOffset.y -= offsetStep; changed = true; break;
+            case VK_DOWN:  currentOffset.y += offsetStep; changed = true; break;
             }
         }
 
-        // Update view if position changed
-        if (offsetChanged) {
+        if (changed) {
             CalculateSourceRects();
             if (currentZoomLevel > 1) {
                 MagSetWindowSource(hwndMag, sourceRects[currentZoomLevel - 1]);
@@ -280,7 +190,6 @@ LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
     return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
 }
 
-// Mouse hook procedure for zoom control
 LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode >= 0) {
         MSLLHOOKSTRUCT* pMouse = (MSLLHOOKSTRUCT*)lParam;
@@ -288,9 +197,7 @@ LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
         switch (wParam) {
         case WM_RBUTTONDOWN:
             isRightMouseDown = true;
-            if (currentZoomLevel > 1) {
-                ShowWindow(hwndMagnifier, SW_SHOW);
-            }
+            if (currentZoomLevel > 1) ShowWindow(hwndMagnifier, SW_SHOW);
             break;
 
         case WM_RBUTTONUP:
@@ -300,13 +207,10 @@ LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
 
         case WM_MOUSEWHEEL:
             if (isRightMouseDown) {
-                // Change zoom level based on wheel direction
                 int delta = GET_WHEEL_DELTA_WPARAM(pMouse->mouseData);
-                currentZoomLevel = delta > 0 ? min(currentZoomLevel + 1, 5)
-                    : max(currentZoomLevel - 1, 1);
+                currentZoomLevel = delta > 0 ? min(currentZoomLevel + 1, 5) : max(currentZoomLevel - 1, 1);
 
                 if (currentZoomLevel > 1) {
-                    // Apply zoom transform
                     MAGTRANSFORM matrix = { {
                         {zoomLevels[currentZoomLevel - 1], 0, 0},
                         {0, zoomLevels[currentZoomLevel - 1], 0},
@@ -325,37 +229,26 @@ LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
     return CallNextHookEx(hMouseHook, nCode, wParam, lParam);
 }
 
-/*============== WINDOW PROCEDURE ==============*/
-LRESULT CALLBACK MagnifierWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_TIMER:
-        // Update magnifier source while active
-        if (isRightMouseDown && currentZoomLevel > 1) {
-            MagSetWindowSource(hwndMag, sourceRects[currentZoomLevel - 1]);
-        }
-        break;
+/*============== LOAD CONFIGURATION ==============*/
+void LoadConfig() {
+    WCHAR configPath[MAX_PATH];
+    GetModuleFileName(NULL, configPath, MAX_PATH);
+    PathRemoveFileSpec(configPath);
+    PathAppend(configPath, L"MagnifierPlus.ini");
 
-    case WM_DESTROY:
-        // Cleanup hooks and tray icon
-        UnhookWindowsHookEx(hMouseHook);
-        UnhookWindowsHookEx(hKeyboardHook);
-        Shell_NotifyIcon(NIM_DELETE, &nid);
-        PostQuitMessage(0);
-        break;
+    windowWidth = GetPrivateProfileInt(L"Window", L"Width", DEFAULT_WINDOW_WIDTH, configPath);
+    windowHeight = GetPrivateProfileInt(L"Window", L"Height", DEFAULT_WINDOW_HEIGHT, configPath);
+    baseZoomSize = GetPrivateProfileInt(L"Zoom", L"Size", DEFAULT_BASE_ZOOM_SIZE, configPath);
+    targetFPS = GetPrivateProfileInt(L"Performance", L"FPS", DEFAULT_TARGET_FPS, configPath);
+    offsetStep = GetPrivateProfileInt(L"Movement", L"StepSize", DEFAULT_OFFSET_STEP, configPath);
+    horizontalAdjust = GetPrivateProfileInt(L"Adjustments", L"Horizontal", DEFAULT_HORIZONTAL_ADJUST, configPath);
+    verticalAdjust = GetPrivateProfileInt(L"Adjustments", L"Vertical", DEFAULT_VERTICAL_ADJUST, configPath);
 
-    case WM_USER + 1:  // Tray icon messages
-        if (lParam == WM_RBUTTONUP) {
-            DestroyWindow(hwnd);
-        }
-        break;
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-    return 0;
+    CalculateInitialOffset();
+    CalculateSourceRects();
 }
 
-/*============== ENTRY POINT ==============*/
+/*============== APPLICATION ENTRY POINT ==============*/
 int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     LPTSTR lpCmdLine, int nCmdShow) {
     // Load configuration
@@ -364,23 +257,16 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     // Show startup information
     ShowStartupInfo();
 
-    // Initialize zoom areas
-    CalculateSourceRects();
-
-    // Initialize magnification API
     if (!MagInitialize()) {
-        MessageBox(NULL, _T("Failed to initialize magnification API!"),
-            _T("Magnifier+ Error"), MB_ICONERROR);
+        MessageBox(NULL, L"Failed to initialize magnification API!", L"Error", MB_ICONERROR);
         return -1;
     }
 
-    // Set up input hooks
+    // Set input hooks
     hMouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, hInstance, 0);
     hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardHookProc, hInstance, 0);
-
     if (!hMouseHook || !hKeyboardHook) {
-        MessageBox(NULL, _T("Failed to initialize input hooks!"),
-            _T("Magnifier+ Error"), MB_ICONERROR);
+        MessageBox(NULL, L"Failed to set input hooks!", L"Error", MB_ICONERROR);
         MagUninitialize();
         return -1;
     }
@@ -389,26 +275,24 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     WNDCLASS wc = { 0 };
     wc.lpfnWndProc = MagnifierWndProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = _T("MagnifierWindowClass");
-    wc.hIcon = LoadProgramIcon();
+    wc.lpszClassName = L"MagnifierWindowClass";
+    wc.hIcon = LoadCustomIcon();
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
     if (!RegisterClass(&wc)) {
-        MessageBox(NULL, _T("Window registration failed!"),
-            _T("Magnifier+ Error"), MB_ICONERROR);
+        MessageBox(NULL, L"Window registration failed!", L"Error", MB_ICONERROR);
         MagUninitialize();
         return -1;
     }
 
-    // Get screen dimensions for centering
+    // Create main window
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-    // Create main window
     hwndMagnifier = CreateWindowEx(
         WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT,
-        _T("MagnifierWindowClass"),
-        _T("Magnifier+ (Right-click + Scroll: Zoom | Right-click + Arrows: Move)"),
+        L"MagnifierWindowClass",
+        L"Magnifier+ (Right-click + Scroll: Zoom | Arrows: Move)",
         WS_POPUP,
         (screenWidth - windowWidth) / 2,
         (screenHeight - windowHeight) / 2,
@@ -417,17 +301,10 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     );
 
     if (!hwndMagnifier) {
-        MessageBox(NULL, _T("Window creation failed!"),
-            _T("Magnifier+ Error"), MB_ICONERROR);
+        MessageBox(NULL, L"Window creation failed!", L"Error", MB_ICONERROR);
         MagUninitialize();
         return -1;
     }
-
-    // Set window attributes
-    SetWindowLong(hwndMagnifier, GWL_EXSTYLE,
-        GetWindowLong(hwndMagnifier, GWL_EXSTYLE) |
-        WS_EX_TRANSPARENT | WS_EX_LAYERED);
-    SetLayeredWindowAttributes(hwndMagnifier, 0, 255, LWA_ALPHA);
 
     // Create magnifier control
     hwndMag = CreateWindow(
@@ -438,13 +315,13 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     );
 
     if (!hwndMag) {
-        MessageBox(NULL, _T("Failed to create magnifier control!"),
-            _T("Magnifier+ Error"), MB_ICONERROR);
+        MessageBox(NULL, L"Failed to create magnifier control!", L"Error", MB_ICONERROR);
+        DestroyWindow(hwndMagnifier);
         MagUninitialize();
         return -1;
     }
 
-    // Set initial zoom transform
+    // Set initial transform
     MAGTRANSFORM matrix = { {
         {zoomLevels[currentZoomLevel - 1], 0, 0},
         {0, zoomLevels[currentZoomLevel - 1], 0},
@@ -452,21 +329,20 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     } };
     MagSetWindowTransform(hwndMag, &matrix);
 
-    // Set up system tray icon
+    // Setup tray icon
     nid.cbSize = sizeof(nid);
     nid.hWnd = hwndMagnifier;
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_USER + 1;
-    nid.hIcon = LoadProgramIcon();
+    nid.hIcon = LoadCustomIcon();
     wcscpy_s(nid.szTip, L"Magnifier+ (Right-click to exit)");
     Shell_NotifyIcon(NIM_ADD, &nid);
 
-    // Set refresh timer
+    // Main loop
     SetTimer(hwndMagnifier, 1, 1000 / targetFPS, NULL);
-    ShowWindow(hwndMagnifier, SW_HIDE);  // Start hidden
+    ShowWindow(hwndMagnifier, SW_HIDE);
 
-    // Main message loop
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
