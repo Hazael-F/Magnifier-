@@ -1,8 +1,8 @@
 # 🔍 Magnifier+ 
 
-Link to Latest Release (v1.0): https://github.com/Hazael-F/Magnifier-/releases/tag/v1.0.0
+Link to Latest Release (v1.0.1): https://github.com/Hazael-F/Magnifier-/releases/tag/v1.0.1
 
-DIRECT DOWNLOAD: https://github.com/Hazael-F/Magnifier-/releases/download/v1.0.0/Magnifier+_v1.0.zip
+DIRECT DOWNLOAD: https://github.com/Hazael-F/Magnifier-/releases/download/v1.0.1/Magnifier+_v1.0.1.zip
 
 *A lightweight, customizable screen magnifier for Windows with smooth zoom controls and system tray accessibility.*
 
