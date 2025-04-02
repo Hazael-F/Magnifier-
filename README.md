@@ -1,5 +1,7 @@
 # 🔍 Magnifier+ 
 
+Link to Latest Release (v1.0): https://github.com/Hazael-F/Magnifier-/releases/tag/v1.0.0
+
 *A lightweight, customizable screen magnifier for Windows with smooth zoom controls and system tray accessibility.*
 
 ## ✨ Features
