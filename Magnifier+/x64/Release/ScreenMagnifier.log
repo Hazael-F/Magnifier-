@@ -1,0 +1,10 @@
+﻿  Main.cpp
+C:\Users\hazas\OneDrive\Documents\School\PG1\WIP\ScreenMagnifier\Main.cpp(5,9): warning C4005: 'UNICODE': macro redefinition
+      C:\Users\hazas\OneDrive\Documents\School\PG1\WIP\ScreenMagnifier\Main.cpp(5,9):
+      'UNICODE' previously declared on the command line
+  
+C:\Users\hazas\OneDrive\Documents\School\PG1\WIP\ScreenMagnifier\Main.cpp(6,9): warning C4005: '_UNICODE': macro redefinition
+      C:\Users\hazas\OneDrive\Documents\School\PG1\WIP\ScreenMagnifier\Main.cpp(6,9):
+      '_UNICODE' previously declared on the command line
+  
+C:\Users\hazas\OneDrive\Documents\School\PG1\WIP\ScreenMagnifier\Main.cpp(81,15): error C4996: '_wfopen': This function or variable may be unsafe. Consider using _wfopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.

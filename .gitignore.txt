@@ -1,0 +1,24 @@
+# Build directories
+[Bb]in/
+[Oo]bj/
+[Rr]elease/
+[Dd]ebug/
+x64/
+x86/
+
+# Visual Studio files
+*.suo
+*.user
+*.pdb
+*.ilk
+*.sdf
+*.opensdf
+
+# Compiled binaries
+*.exe
+*.dll
+*.lib
+
+# IDE/Editor files
+.vs/
+.vscode/

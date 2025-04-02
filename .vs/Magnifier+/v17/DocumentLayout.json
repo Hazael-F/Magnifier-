@@ -1,0 +1,41 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\hazas\\OneDrive\\Documents\\School\\PG1\\WIP\\ScreenMagnifier\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{8E98E9EB-8668-4947-89C3-1A804B52C44F}|ScreenMagnifier.vcxproj|C:\\Users\\hazas\\OneDrive\\Documents\\School\\PG1\\WIP\\ScreenMagnifier\\Main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{8E98E9EB-8668-4947-89C3-1A804B52C44F}|ScreenMagnifier.vcxproj|solutionrelative:Main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Main.cpp",
+              "DocumentMoniker": "C:\\Users\\hazas\\OneDrive\\Documents\\School\\PG1\\WIP\\ScreenMagnifier\\Main.cpp",
+              "RelativeDocumentMoniker": "Main.cpp",
+              "ToolTip": "C:\\Users\\hazas\\OneDrive\\Documents\\School\\PG1\\WIP\\ScreenMagnifier\\Main.cpp",
+              "RelativeToolTip": "Main.cpp",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAABwAAAAbAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-04-01T23:28:50.997Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
