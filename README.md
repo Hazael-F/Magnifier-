@@ -16,6 +16,27 @@
 3. **Hold right-click + arrow keys** to adjust position.
 4. **Right-click system tray icon** to exit.
 
+================================================================================
+
+## 🙏 Credits
+
+**Magnifier+** was developed with the help of these resources and contributors:
+
+### Core Development
+- [@Hazael-F](https://github.com/Hazael-F) - Main developer
+- [DeepSeek Chat](https://deepseek.com) - AI coding assistant
+
+### Libraries & APIs
+- [Windows Magnification API](https://learn.microsoft.com/en-us/windows/win32/api/_magapi/) - Powering the zoom functionality
+- `shlwapi.lib` - For configuration file handling
+- Windows GDI - Graphics and overlay rendering
+
+### Special Thanks
+- Microsoft Docs team for API documentation
+- Open-source screen magnifier projects for inspiration
+
+===============================================================================
+
 ### ⚙️ Configuration
 Edit `MagnifierPlus.ini` to customize:
 ```ini
