@@ -7,12 +7,14 @@
   - System tray accessibility
   - Precise offset configuration
   - Configurable settings via INI file
+  - Optional circular window shape
 ===============================================*/
 
 #include <windows.h>
 #include <magnification.h>
 #include <tchar.h>
 #include <shlwapi.h>
+#include <math.h>
 
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "Magnification.lib")
@@ -23,6 +25,7 @@
 #define DEFAULT_BASE_ZOOM_SIZE    100
 #define DEFAULT_TARGET_FPS        60
 #define DEFAULT_OFFSET_STEP       5
+#define DEFAULT_CIRCULAR_MODE     false
 
 // Default manual adjustments (in steps)
 #define DEFAULT_HORIZONTAL_ADJUST  13
@@ -36,6 +39,7 @@ int targetFPS = DEFAULT_TARGET_FPS;
 int offsetStep = DEFAULT_OFFSET_STEP;
 int horizontalAdjust = DEFAULT_HORIZONTAL_ADJUST;
 int verticalAdjust = DEFAULT_VERTICAL_ADJUST;
+bool circularMode = DEFAULT_CIRCULAR_MODE;
 
 float zoomLevels[] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };
 int currentZoomLevel = 1;
@@ -46,6 +50,17 @@ HWND hwndMagnifier, hwndMag;
 bool isRightMouseDown = false;
 HHOOK hMouseHook, hKeyboardHook;
 NOTIFYICONDATA nid = { 0 };
+HRGN hCircleRegion = NULL;
+
+/*============== CREATE CIRCULAR REGION ==============*/
+void CreateCircularRegion() {
+    if (hCircleRegion) {
+        DeleteObject(hCircleRegion);
+    }
+
+    // Create a circular region
+    hCircleRegion = CreateEllipticRgn(0, 0, windowWidth, windowHeight);
+}
 
 /*============== PRECISE OFFSET CALCULATION ==============*/
 void CalculateInitialOffset() {
@@ -121,6 +136,7 @@ void ShowStartupInfo() {
         L"Configuration File:\n%s\n\n"
         L"Current Settings:\n"
         L"- Window: %dx%d pixels\n"
+        L"- Shape: %s\n"
         L"- Zoom Area: %d pixels\n"
         L"- Initial Offset: (%d, %d)\n"
         L"- Adjustments: %dH, %dV steps\n"
@@ -130,7 +146,9 @@ void ShowStartupInfo() {
         L"1. Right-click + Scroll: Zoom (1x-5x)\n"
         L"2. Right-click + Arrows: Move view\n"
         L"3. Right-click tray icon: Exit",
-        path, windowWidth, windowHeight, baseZoomSize,
+        path, windowWidth, windowHeight,
+        circularMode ? L"Circle" : L"Square",
+        baseZoomSize,
         currentOffset.x, currentOffset.y,
         horizontalAdjust, verticalAdjust,
         offsetStep, targetFPS);
@@ -151,6 +169,7 @@ LRESULT CALLBACK MagnifierWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
         UnhookWindowsHookEx(hMouseHook);
         UnhookWindowsHookEx(hKeyboardHook);
         Shell_NotifyIcon(NIM_DELETE, &nid);
+        if (hCircleRegion) DeleteObject(hCircleRegion);
         PostQuitMessage(0);
         break;
 
@@ -244,6 +263,9 @@ void LoadConfig() {
     horizontalAdjust = GetPrivateProfileInt(L"Adjustments", L"Horizontal", DEFAULT_HORIZONTAL_ADJUST, configPath);
     verticalAdjust = GetPrivateProfileInt(L"Adjustments", L"Vertical", DEFAULT_VERTICAL_ADJUST, configPath);
 
+    // Load circular mode setting
+    circularMode = GetPrivateProfileInt(L"Window", L"Circular", DEFAULT_CIRCULAR_MODE, configPath) != 0;
+
     CalculateInitialOffset();
     CalculateSourceRects();
 }
@@ -304,6 +326,12 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         MessageBox(NULL, L"Window creation failed!", L"Error", MB_ICONERROR);
         MagUninitialize();
         return -1;
+    }
+
+    // Create circular region if needed
+    if (circularMode) {
+        CreateCircularRegion();
+        SetWindowRgn(hwndMagnifier, hCircleRegion, TRUE);
     }
 
     // Create magnifier control
