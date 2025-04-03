@@ -8,6 +8,7 @@
   - Precise offset configuration
   - Configurable settings via INI file
   - Optional circular window shape
+  - Optional mouse tracking mode
 ===============================================*/
 
 #include <windows.h>
@@ -26,6 +27,7 @@
 #define DEFAULT_TARGET_FPS        60
 #define DEFAULT_OFFSET_STEP       5
 #define DEFAULT_CIRCULAR_MODE     false
+#define DEFAULT_TRACK_MOUSE       false
 
 // Default manual adjustments (in steps)
 #define DEFAULT_HORIZONTAL_ADJUST  13
@@ -40,11 +42,13 @@ int offsetStep = DEFAULT_OFFSET_STEP;
 int horizontalAdjust = DEFAULT_HORIZONTAL_ADJUST;
 int verticalAdjust = DEFAULT_VERTICAL_ADJUST;
 bool circularMode = DEFAULT_CIRCULAR_MODE;
+bool trackMouse = DEFAULT_TRACK_MOUSE;
 
 float zoomLevels[] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };
 int currentZoomLevel = 1;
 POINT currentOffset = { 0, 0 };
 RECT sourceRects[5];
+POINT lastMousePos = { 0, 0 };
 
 HWND hwndMagnifier, hwndMag;
 bool isRightMouseDown = false;
@@ -89,7 +93,7 @@ void CalculateInitialOffset() {
 void CalculateSourceRects() {
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-    POINT center = { screenWidth / 2, screenHeight / 2 };
+    POINT center = trackMouse ? lastMousePos : POINT{ screenWidth / 2, screenHeight / 2 };
 
     for (int i = 0; i < 5; i++) {
         float zoom = zoomLevels[i];
@@ -101,6 +105,25 @@ void CalculateSourceRects() {
             center.x + (scaledSize / 2) + (int)(currentOffset.x / zoom),
             center.y + (scaledSize / 2) + (int)(currentOffset.y / zoom)
         };
+    }
+}
+
+/*============== UPDATE MAGNIFIER POSITION ==============*/
+void UpdateMagnifierPosition() {
+    if (trackMouse && currentZoomLevel > 1) {
+        // Position the window centered on the mouse
+        SetWindowPos(
+            hwndMagnifier,
+            HWND_TOPMOST,
+            lastMousePos.x - windowWidth / 2,
+            lastMousePos.y - windowHeight / 2,
+            0, 0,
+            SWP_NOSIZE | SWP_NOACTIVATE
+        );
+
+        // Update the source rectangle
+        CalculateSourceRects();
+        MagSetWindowSource(hwndMag, sourceRects[currentZoomLevel - 1]);
     }
 }
 
@@ -137,6 +160,7 @@ void ShowStartupInfo() {
         L"Current Settings:\n"
         L"- Window: %dx%d pixels\n"
         L"- Shape: %s\n"
+        L"- Tracking: %s\n"
         L"- Zoom Area: %d pixels\n"
         L"- Initial Offset: (%d, %d)\n"
         L"- Adjustments: %dH, %dV steps\n"
@@ -148,6 +172,7 @@ void ShowStartupInfo() {
         L"3. Right-click tray icon: Exit",
         path, windowWidth, windowHeight,
         circularMode ? L"Circle" : L"Square",
+        trackMouse ? L"Mouse" : L"Screen Center",
         baseZoomSize,
         currentOffset.x, currentOffset.y,
         horizontalAdjust, verticalAdjust,
@@ -161,7 +186,12 @@ LRESULT CALLBACK MagnifierWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
     switch (uMsg) {
     case WM_TIMER:
         if (isRightMouseDown && currentZoomLevel > 1) {
-            MagSetWindowSource(hwndMag, sourceRects[currentZoomLevel - 1]);
+            if (trackMouse) {
+                UpdateMagnifierPosition();
+            }
+            else {
+                MagSetWindowSource(hwndMag, sourceRects[currentZoomLevel - 1]);
+            }
         }
         break;
 
@@ -216,7 +246,13 @@ LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
         switch (wParam) {
         case WM_RBUTTONDOWN:
             isRightMouseDown = true;
-            if (currentZoomLevel > 1) ShowWindow(hwndMagnifier, SW_SHOW);
+            if (currentZoomLevel > 1) {
+                ShowWindow(hwndMagnifier, SW_SHOW);
+                if (trackMouse) {
+                    lastMousePos = pMouse->pt;
+                    UpdateMagnifierPosition();
+                }
+            }
             break;
 
         case WM_RBUTTONUP:
@@ -226,21 +262,54 @@ LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
 
         case WM_MOUSEWHEEL:
             if (isRightMouseDown) {
-                int delta = GET_WHEEL_DELTA_WPARAM(pMouse->mouseData);
-                currentZoomLevel = delta > 0 ? min(currentZoomLevel + 1, 5) : max(currentZoomLevel - 1, 1);
+                // Block wheel events from reaching other applications when tracking mouse
+                if (trackMouse) {
+                    // Only process wheel events when right mouse button is down
+                    int delta = GET_WHEEL_DELTA_WPARAM(pMouse->mouseData);
+                    currentZoomLevel = delta > 0 ? min(currentZoomLevel + 1, 5) : max(currentZoomLevel - 1, 1);
 
-                if (currentZoomLevel > 1) {
-                    MAGTRANSFORM matrix = { {
-                        {zoomLevels[currentZoomLevel - 1], 0, 0},
-                        {0, zoomLevels[currentZoomLevel - 1], 0},
-                        {0, 0, 1}
-                    } };
-                    MagSetWindowTransform(hwndMag, &matrix);
-                    ShowWindow(hwndMagnifier, SW_SHOW);
+                    if (currentZoomLevel > 1) {
+                        MAGTRANSFORM matrix = { {
+                            {zoomLevels[currentZoomLevel - 1], 0, 0},
+                            {0, zoomLevels[currentZoomLevel - 1], 0},
+                            {0, 0, 1}
+                        } };
+                        MagSetWindowTransform(hwndMag, &matrix);
+                        ShowWindow(hwndMagnifier, SW_SHOW);
+                        if (trackMouse) {
+                            lastMousePos = pMouse->pt;
+                            UpdateMagnifierPosition();
+                        }
+                    }
+                    else {
+                        ShowWindow(hwndMagnifier, SW_HIDE);
+                    }
+                    return 1; // Block the message from reaching other windows
                 }
                 else {
-                    ShowWindow(hwndMagnifier, SW_HIDE);
+                    // Original wheel behavior when not tracking mouse
+                    int delta = GET_WHEEL_DELTA_WPARAM(pMouse->mouseData);
+                    currentZoomLevel = delta > 0 ? min(currentZoomLevel + 1, 5) : max(currentZoomLevel - 1, 1);
+
+                    if (currentZoomLevel > 1) {
+                        MAGTRANSFORM matrix = { {
+                            {zoomLevels[currentZoomLevel - 1], 0, 0},
+                            {0, zoomLevels[currentZoomLevel - 1], 0},
+                            {0, 0, 1}
+                        } };
+                        MagSetWindowTransform(hwndMag, &matrix);
+                        ShowWindow(hwndMagnifier, SW_SHOW);
+                    }
+                    else {
+                        ShowWindow(hwndMagnifier, SW_HIDE);
+                    }
                 }
+            }
+            break;
+
+        case WM_MOUSEMOVE:
+            if (trackMouse && isRightMouseDown) {
+                lastMousePos = pMouse->pt;
             }
             break;
         }
@@ -265,6 +334,9 @@ void LoadConfig() {
 
     // Load circular mode setting
     circularMode = GetPrivateProfileInt(L"Window", L"Circular", DEFAULT_CIRCULAR_MODE, configPath) != 0;
+
+    // Load mouse tracking setting
+    trackMouse = GetPrivateProfileInt(L"Tracking", L"Mouse", DEFAULT_TRACK_MOUSE, configPath) != 0;
 
     CalculateInitialOffset();
     CalculateSourceRects();
@@ -316,8 +388,8 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         L"MagnifierWindowClass",
         L"Magnifier+ (Right-click + Scroll: Zoom | Arrows: Move)",
         WS_POPUP,
-        (screenWidth - windowWidth) / 2,
-        (screenHeight - windowHeight) / 2,
+        trackMouse ? 0 : (screenWidth - windowWidth) / 2,  // Initial position depends on mode
+        trackMouse ? 0 : (screenHeight - windowHeight) / 2,
         windowWidth, windowHeight,
         NULL, NULL, hInstance, NULL
     );
