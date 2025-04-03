@@ -44,11 +44,19 @@ DIRECT DOWNLOAD: https://github.com/Hazael-F/Magnifier-/releases/download/v1.0.1
 ### ⚙️ Configuration
 Edit `MagnifierPlus.ini` to customize:
 ```ini
-[Settings]
-WindowWidth=300       ; Magnifier window width
-WindowHeight=300      ; Magnifier window height
-BaseZoomSize=100      ; Base zoom area size (pixels)
-InitialLeftOffset=-100 ; Default X offset
-InitialDownOffset=-100 ; Default Y offset
-TargetFPS=71          ; Refresh rate
-OffsetStep=5          ; Position adjustment step size
+[Window]
+Width=300
+Height=300
+
+[Zoom]
+Size=100
+
+[Movement]
+StepSize=5
+
+[Adjustments]
+Horizontal=0
+Vertical=0
+
+[Performance]
+FPS=60
