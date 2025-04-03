@@ -47,16 +47,20 @@ Edit `MagnifierPlus.ini` to customize:
 [Window]
 Width=300
 Height=300
+Circular=1    ;  0 for circular  |  1 for cubic
+
+[Tracking]
+Mouse=1       ;  0 for centered  |  1 for mouse-tracked
 
 [Zoom]
-Size=100
-
-[Movement]
-StepSize=5
-
-[Adjustments]
-Horizontal=0
-Vertical=0
+AreaSize=100
 
 [Performance]
-FPS=60
+RefreshRate=60
+
+[Movement]
+StepSize=5    ;  for manual alignment with arrow keys
+
+[Adjustments]
+Horizontal=0  ;  offsets the window by steps (left-right)
+Vertical=0    ;  offsets the window by steps (up-down)
