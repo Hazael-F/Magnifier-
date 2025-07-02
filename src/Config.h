@@ -10,8 +10,8 @@
 #define DEFAULT_MOUSE_TRACKING    false
 
 // Default manual adjustments (in steps)
-#define DEFAULT_HORIZONTAL_OFFSET  13
-#define DEFAULT_VERTICAL_OFFSET    13
+#define DEFAULT_HORIZONTAL_OFFSET  0
+#define DEFAULT_VERTICAL_OFFSET    0
 
 // Zoom levels
 extern const float zoomLevels[];
