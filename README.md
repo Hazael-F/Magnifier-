@@ -1,28 +1,40 @@
-# 🔍 Magnifier+ 
+# ⚠️ Archived Legacy Version (v1.0.2)  
+This branch (`archive/main`) is **deprecated** and preserved for historical reference only.  
+**Active development continues in [`master`](https://github.com/Hazael-F/Magnifier-).**  
 
-Link to Latest Release (v1.0.2): https://github.com/Hazael-F/Magnifier-/releases/tag/v1.0.2
+---
 
-DIRECT DOWNLOAD: https://github.com/Hazael-F/Magnifier-/releases/download/v1.0.2/Magnifier+_v1.0.2.zip
+### **About This Version**  
+- **Code Quality**: This branch contains early, unrefactored code (`main.cpp`-only implementation).  
+- **Formatting**: Poorly organized
+- **Latest Release**: [v1.0.2](https://github.com/Hazael-F/Magnifier-/releases/tag/v1.0.2)  
+  - 🔗 [Direct Download](https://github.com/Hazael-F/Magnifier-/releases/download/v1.0.2/Magnifier+_v1.0.2.zip)  
 
-*A lightweight, customizable screen magnifier for Windows with smooth zoom controls and system tray accessibility.*
+---
 
-## ✨ Features
-- **5-level smooth zoom** (1x to 5x) via mouse wheel + right-click
-- **Position adjustment** with arrow keys (hold right-click)
-- **System tray integration** for quick access
-- **Custom reticle** targeting overlay
-- **INI configurable** settings (window size, zoom area, FPS, offsets)
-- **Lightweight** (uses native Windows Magnification API)
+### **Legacy Features**  
+A lightweight screen magnifier for Windows with:  
+- 5-level zoom (mouse wheel + right-click)  
+- Arrow key positioning adjustments  
+- System tray integration  
+- INI configuration  
 
-## 🛠️ How to Use
-1. **Run** `Magnifier+.exe`.
-2. **Hold right-click + scroll** to zoom in/out.
-3. **Hold right-click + arrow keys** to adjust position.
-4. **Right-click system tray icon** to exit.
+---
 
-=========================================================================
+### **Why This Branch Exists**  
+- Preserves the original state of Magnifier 1.0.2.  
+- Demonstrates project evolution (compare with `master` for improvements).  
 
-## 🙏 Credits
+---
+
+### **⚠️ Limitations**  
+1. **Monolithic Code**: All logic in `main.cpp` (no separation of concerns).  
+2. **Technical Debt**: Hardcoded values, minimal error handling.  
+3. **Deprecated**: No further updates or bug fixes.  
+
+---
+
+### 🙏 Credits
 
 **Magnifier+** was developed with the help of these resources and contributors:
 
@@ -38,6 +50,7 @@ DIRECT DOWNLOAD: https://github.com/Hazael-F/Magnifier-/releases/download/v1.0.2
 ### Special Thanks
 - Microsoft Docs team for API documentation
 - Open-source screen magnifier projects for inspiration
+- You, for reading this!
 
 =======================================================================
 
